@@ -1,8 +1,10 @@
 import pygame, random, sys
 from pygame.locals import *
+import pyganim
 
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
+DISPLAYMODE = (600,600)
 TEXTCOLOR = (255, 255, 255)
 BACKGROUNDCOLOR = (0, 0, 0)
 FPS = 40
@@ -12,6 +14,7 @@ ASTEROIDMINSPEED = 1
 ASTEROIDMAXSPEED = 8
 ADDNEW_ASTEROID_RATE = 6
 PLAYERMOVERATE = 5
+TASA_ASTEROIDES_ENERGETICOS = 0.9
 
 def terminate():
     pygame.quit()
@@ -26,11 +29,17 @@ def waitForPlayerToPressKey():
                 if event.key == K_ESCAPE: # Al pulsar la tecla esc se sale del juego
                     terminate()
                 return
-
-def playerHasHitAsteroid(jugadorRect, asteroides):
-    for a in asteroides:
-        if jugadorRect.colliderect(a['rect']):
-            return True
+            
+# Devuelve falso si no hay choque o una cadena informativa si lo hay.
+# si el choque es energertico elemina el asteroide
+def jugadorChocaAsteroide(jugadorRect, asteroides):
+    for a in asteroides[:]:
+        if jugadorRect.colliderect(a['rect']) and a['energetico'] == True:
+            asteroides.remove(a)
+            return 'choque energetico'
+        elif jugadorRect.colliderect(a['rect']):
+            return 'choque destructivo'
+        
     return False
 
 def drawText(text, font, surface, x, y):
@@ -39,6 +48,16 @@ def drawText(text, font, surface, x, y):
     textrect.topleft = (x, y)
     surface.blit(textobj, textrect)
 
+def animaExplosion():
+
+    intervalo = 100
+
+    for i in range(1,6):
+        windowSurface.blit(imagenExplosion[i], jugadorRect)
+        pygame.time.wait(intervalo)
+        pygame.display.update()
+   
+  
 # set up pygame
 pygame.init()
 mainClock = pygame.time.Clock()
@@ -50,21 +69,47 @@ pygame.display.set_caption('Cinturon de asteroides')
 font = pygame.font.SysFont(None, 48)
 
 # set up sounds
-motorsOn = pygame.mixer.Sound('sonidos/motores encendidos.wav')
-explosion = pygame.mixer.Sound('sonidos/explosion.wav')
-energyUp = pygame.mixer.Sound('sonidos/energy up.wav')
+sonidoMotorsOn = pygame.mixer.Sound('sonidos/motores encendidos.wav')
+sonidoExplosion = pygame.mixer.Sound('sonidos/explosion.wav')
+sonidoPickup = pygame.mixer.Sound('sonidos/pickup.wav')
 gameOverSound = pygame.mixer.Sound('sonidos/gameover.wav')
 backGroundSound = pygame.mixer.Sound('sonidos/musica de fondo.wav')
 
 # set up images
+imagenExplosion = []
 imagenNaveCentro = pygame.image.load('nave/nave_centro.png')
 imagenNaveCentroMotorOn = pygame.image.load('nave/nave_centro_motor_on.png')
 imagenNaveIzquierda = pygame.image.load('nave/nave_izquierda.png')
 imagenNaveIzquierdaMotorOn = pygame.image.load('nave/nave_izquierda_motor_on.png')
 imagenNaveDerecha = pygame.image.load('nave/nave_derecha.png')
 imagenNaveDerechaMotorOn = pygame.image.load('nave/nave_derecha_motor_on.png')
-jugadorRect = imagenNaveCentro.get_rect()
+imagenExplosion.append(pygame.image.load('explosion/explosion1.png'))
+imagenExplosion.append(pygame.image.load('explosion/explosion2.png'))
+imagenExplosion.append(pygame.image.load('explosion/explosion3.png'))
+imagenExplosion.append(pygame.image.load('explosion/explosion4.png'))
+imagenExplosion.append(pygame.image.load('explosion/explosion5.png'))
+imagenExplosion.append(pygame.image.load('explosion/explosion6.png'))
 imagenAsteroide = pygame.image.load('meteoritos/m1.png')
+imagenAsteroideEnergetico = pygame.image.load('meteoritos/mx.png')
+imagenFondo = pygame.image.load('Fondo/fondo.jpg').convert()
+jugadorRect = imagenNaveCentro.get_rect()
+
+#Redimensiono las imagenes de la nave
+medida = 50
+imagenNaveCentro_aEscala = pygame.transform.scale(imagenNaveCentro, (medida, medida))
+imagenNaveIzquierda_aEscala = pygame.transform.scale(imagenNaveIzquierda, (medida, medida))
+imagenNaveDerecha_aEscala = pygame.transform.scale(imagenNaveDerecha, (medida, medida))
+
+imagenNaveCentroMotorOn_aEscala = pygame.transform.scale(imagenNaveCentroMotorOn, (medida, medida))
+imagenNaveDerechaMotorOn_aEscala = pygame.transform.scale(imagenNaveDerechaMotorOn, (medida, medida))
+imagenNaveIzquierdaMotorOn_aEscala = pygame.transform.scale(imagenNaveIzquierdaMotorOn, (medida, medida))
+
+for i in range(0,5):
+    imagenExplosion[i] = pygame.transform.scale(imagenExplosion[i], (medida, medida))
+
+# set up background
+imangenFondo = pygame.transform.scale(imagenFondo, DISPLAYMODE)
+windowSurface.blit(imangenFondo, (0,0))
 
 # Muestra la pantalla de bienvenida
 drawText('Cinturon de Asteroides', font, windowSurface, (WINDOWWIDTH / 10), (WINDOWHEIGHT / 3))
@@ -84,8 +129,7 @@ while True:
     backGroundSound.play()
 
     while True: 
-        score += 1 
-
+        
         for event in pygame.event.get():
             if event.type == QUIT:
                 terminate()
@@ -121,9 +165,17 @@ while True:
         if contadorAsteroides == ADDNEW_ASTEROID_RATE:
             contadorAsteroides = 0
             tamano_asteroide = random.randint(ASTEROIDMINSIZE, ASTEROIDMAXSIZE)
+            esEnergetico = (random.random() > TASA_ASTEROIDES_ENERGETICOS)
+            if esEnergetico:
+                imagen = pygame.transform.scale(imagenAsteroideEnergetico, (tamano_asteroide, tamano_asteroide))
+            else:
+                imagen = pygame.transform.scale(imagenAsteroide, (tamano_asteroide, tamano_asteroide))
+                
             nuevoAsteroide = {'rect': pygame.Rect(random.randint(0, WINDOWWIDTH-tamano_asteroide), 0 - tamano_asteroide, tamano_asteroide, tamano_asteroide),
                         'speed': random.randint(ASTEROIDMINSPEED, ASTEROIDMAXSPEED),
-                        'surface':pygame.transform.scale(imagenAsteroide, (tamano_asteroide, tamano_asteroide)),
+                        'surface':imagen,
+                        'animationTime': random.random(),
+                        'energetico': esEnergetico,
                         }
             asteroides.append(nuevoAsteroide)
 
@@ -148,7 +200,7 @@ while True:
                 asteroides.remove(a)
 
         # Pinta el fondo
-        windowSurface.fill(BACKGROUNDCOLOR)
+        windowSurface.blit(imangenFondo, (0,0))
 
         # Pone las puntuaciones
         drawText('Score: %s' % (score), font, windowSurface, 10, 0)
@@ -157,27 +209,28 @@ while True:
         # Pinta la nave y le da sonido a los motores si va hacia adelante
         if moverDerecha:
             if moverAdelante:
-                windowSurface.blit(imagenNaveDerechaMotorOn, jugadorRect)
-                motorsOn.play()
+                windowSurface.blit(imagenNaveDerechaMotorOn_aEscala, jugadorRect)
+                sonidoMotorsOn.play()
             else:   
-                windowSurface.blit(imagenNaveDerecha, jugadorRect)
-                motorsOn.stop()
+                windowSurface.blit(imagenNaveDerecha_aEscala, jugadorRect)
+                sonidoMotorsOn.stop()
                 
         elif moverIzquierda:
             if moverAdelante:
-                windowSurface.blit(imagenNaveIzquierdaMotorOn, jugadorRect)
-                motorsOn.play()
+                windowSurface.blit(imagenNaveIzquierdaMotorOn_aEscala, jugadorRect)
+                sonidoMotorsOn.play()
             else:   
-                windowSurface.blit(imagenNaveIzquierda, jugadorRect)
-                motorsOn.stop()
+                windowSurface.blit(imagenNaveIzquierda_aEscala, jugadorRect)
+                sonidoMotorsOn.stop()
         else:
             if moverAdelante:
-                windowSurface.blit(imagenNaveCentroMotorOn, jugadorRect)
-                motorsOn.play()
-            else:   
-                windowSurface.blit(imagenNaveCentro, jugadorRect)
-                motorsOn.stop()
-            
+                windowSurface.blit(imagenNaveCentroMotorOn_aEscala, jugadorRect)
+                sonidoMotorsOn.play()
+            else:
+                windowSurface.blit(imagenNaveCentro_aEscala, jugadorRect)
+                sonidoMotorsOn.stop()
+
+           
 
         # Dibuja los asteroides
         for a in asteroides:
@@ -186,12 +239,26 @@ while True:
         pygame.display.update()
 
         # Comprueba la colision de algun asteroide con el jugador
-        if playerHasHitAsteroid(jugadorRect, asteroides):
-            if score > topScore:
-                topScore = score 
-            break
+        hayChoque = jugadorChocaAsteroide(jugadorRect, asteroides)
+        if hayChoque:
+            if hayChoque == 'choque destructivo':
+                # Hace la explosion
+                sonidoExplosion.play()
+                animaExplosion()
+                pygame.time.wait(2000)
+                sonidoExplosion.stop()
+                if score > topScore:
+                    topScore = score 
+                break
+            else:
+                # Suma puntos
+                score += 10
+                sonidoPickup.play()
+                
 
         mainClock.tick(FPS)
+
+        
 
     # Para el juego y muestra la pantalla de Game Over
     backGroundSound.stop()
