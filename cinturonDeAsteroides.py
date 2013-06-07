@@ -1,6 +1,5 @@
 import pygame, random, sys
 from pygame.locals import *
-import pyganim
 
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
