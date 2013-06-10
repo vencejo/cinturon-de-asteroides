@@ -14,11 +14,11 @@
 ##	4- Se anima el movimiento del personaje
 ##	5- Se crea la animacion de la explosion
 ##	6- Se crean los asteroides benevolos
-##
-##	pendientes:
 ##	7- Se implementa la barra de energia (aumenta al recolecar asteroides energeticos y disminuye al chocar con los
 ##		asteroides malos o cuando activamos el laser), si llega a cero la nave explota, 
 ##		cuanto mayor es la energia mayor la velocidad de la nave.
+
+##      Pendientes:
 ##
 ##	8- Se implementa el laser
 ##
@@ -27,10 +27,15 @@
 ##	10- Rutina de fin de juego con tabla de puntuaciones
 ##
 ##      11- Introducir planetas en segundo plano moviendose mas lentos para dar sensacion de desplazamiento
+##
+##      12- Variar las tasas de aparcion de los asteroides y la velocidad de los mismos para hacer eljuego mas jugable,
+##          con dificultad creciente 
 
 
 import pygame, random, sys
 from pygame.locals import *
+
+INIT_ENERGY = 25
 
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
@@ -44,7 +49,7 @@ ASTEROIDMINSPEED = 1
 ASTEROIDMAXSPEED = 8
 ADDNEW_ASTEROID_RATE = 6
 PLAYERMOVERATE = 5
-TASA_ASTEROIDES_ENERGETICOS = 0.9
+TASA_ASTEROIDES_ENERGETICOS = 0.1
 
 def terminate():
     pygame.quit()
@@ -60,14 +65,15 @@ def waitForPlayerToPressKey():
                     terminate()
                 return
             
-# Devuelve falso si no hay choque o una cadena informativa si lo hay.
-# si el choque es energertico elemina el asteroide
 def jugadorChocaAsteroide(jugadorRect, asteroides):
+    """Devuelve falso si no hay choque o una cadena informativa si lo hay 
+    si el choque es energertico elemina el asteroide"""
     for a in asteroides[:]:
         if jugadorRect.colliderect(a['rect']) and a['energetico'] == True:
             asteroides.remove(a)
             return 'choque energetico'
         elif jugadorRect.colliderect(a['rect']):
+            asteroides.remove(a)
             return 'choque destructivo'
         
     return False
@@ -79,13 +85,27 @@ def drawText(text, font, surface, x, y):
     surface.blit(textobj, textrect)
 
 def animaExplosion():
-
+    """ Anima los sprites que componen la explosion """
     intervalo = 100
 
     for i in range(1,6):
         windowSurface.blit(imagenExplosion[i], jugadorRect)
         pygame.time.wait(intervalo)
         pygame.display.update()
+
+def muestraBarraEnergia(energia):
+    """ Dibuja una barra de energia vertical coloreada. Tonos rojos para poca energia y verdes para energias altas """
+    nivel_rojo = 255 - energia
+    if nivel_rojo < 0:
+        nivel_rojo = 0
+        
+    nivel_verde = energia
+    if nivel_verde > 255:
+        nivel_verde = 255
+    
+    color = (nivel_rojo,nivel_verde,0)
+    
+    pygame.draw.rect(windowSurface, color , (560, 560, 20, -1 * energia))
    
   
 # set up pygame
@@ -147,11 +167,11 @@ drawText('Pulse una tecla para empezar', font, windowSurface, (WINDOWWIDTH / 10)
 pygame.display.update()
 waitForPlayerToPressKey()
 
-
 topScore = 0
 while True:
     #Inicializa el juego
     asteroides = []
+    energia = INIT_ENERGY
     score = 0
     jugadorRect.topleft = (WINDOWWIDTH / 2, WINDOWHEIGHT - 50)
     moverIzquierda = moverDerecha = moverAdelante = moverAtras = False
@@ -195,7 +215,7 @@ while True:
         if contadorAsteroides == ADDNEW_ASTEROID_RATE:
             contadorAsteroides = 0
             tamano_asteroide = random.randint(ASTEROIDMINSIZE, ASTEROIDMAXSIZE)
-            esEnergetico = (random.random() > TASA_ASTEROIDES_ENERGETICOS)
+            esEnergetico = (random.random() > 1 - TASA_ASTEROIDES_ENERGETICOS)
             if esEnergetico:
                 imagen = pygame.transform.scale(imagenAsteroideEnergetico, (tamano_asteroide, tamano_asteroide))
             else:
@@ -210,14 +230,15 @@ while True:
             asteroides.append(nuevoAsteroide)
 
         # Mueve al jugador
+        energy_factor = energia / INIT_ENERGY
         if moverIzquierda and jugadorRect.left > 0:
-            jugadorRect.move_ip(-1 * PLAYERMOVERATE, 0)
+            jugadorRect.move_ip(-1 * (PLAYERMOVERATE + energy_factor), 0)
         if moverDerecha and jugadorRect.right < WINDOWWIDTH:
-            jugadorRect.move_ip(PLAYERMOVERATE, 0)
+            jugadorRect.move_ip((PLAYERMOVERATE + energy_factor), 0)
         if moverAdelante and jugadorRect.top > 0:
-            jugadorRect.move_ip(0, -1 * PLAYERMOVERATE)
+            jugadorRect.move_ip(0, -1 * (PLAYERMOVERATE + energy_factor))
         if moverAtras and jugadorRect.bottom < WINDOWHEIGHT:
-            jugadorRect.move_ip(0, PLAYERMOVERATE)
+            jugadorRect.move_ip(0, (PLAYERMOVERATE + energy_factor))
 
         # Mueve a los asteroides hacia abajo
         for a in asteroides:
@@ -235,6 +256,8 @@ while True:
         # Pone las puntuaciones
         drawText('Score: %s' % (score), font, windowSurface, 10, 0)
         drawText('Top Score: %s' % (topScore), font, windowSurface, 10, 40)
+        drawText('Energy: %s' % (energia), font, windowSurface, 10, 550)
+        muestraBarraEnergia(energia)
 
         # Pinta la nave y le da sonido a los motores si va hacia adelante
         if moverDerecha:
@@ -272,19 +295,22 @@ while True:
         hayChoque = jugadorChocaAsteroide(jugadorRect, asteroides)
         if hayChoque:
             if hayChoque == 'choque destructivo':
-                # Hace la explosion
-                sonidoExplosion.play()
-                animaExplosion()
-                pygame.time.wait(2000)
-                sonidoExplosion.stop()
-                if score > topScore:
-                    topScore = score 
-                break
+
+                energia -= 10
+                # Hace la explosion si la energia baja de 0
+                if energia < 0:
+                    sonidoExplosion.play()
+                    animaExplosion()
+                    pygame.time.wait(2000)
+                    sonidoExplosion.stop()
+                    if score > topScore:
+                        topScore = score 
+                    break
             else:
                 # Suma puntos
                 score += 10
                 sonidoPickup.play()
-                
+                energia += 10
 
         mainClock.tick(FPS)
 
