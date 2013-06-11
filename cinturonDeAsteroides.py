@@ -17,11 +17,11 @@
 ##	7- Se implementa la barra de energia (aumenta al recolecar asteroides energeticos y disminuye al chocar con los
 ##		asteroides malos o cuando activamos el laser), si llega a cero la nave explota, 
 ##		cuanto mayor es la energia mayor la velocidad de la nave.
-
-##      Pendientes:
 ##
 ##	8- Se implementa el laser
-##
+
+##      Pendientes:
+
 ##	9- Se implementan los asteroides oblicuos
 ##
 ##	10- Rutina de fin de juego con tabla de puntuaciones
@@ -36,6 +36,8 @@ import pygame, random, sys
 from pygame.locals import *
 
 INIT_ENERGY = 25
+
+LASER_DURACION_MAX = 5
 
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
@@ -93,6 +95,19 @@ def animaExplosion():
         pygame.time.wait(intervalo)
         pygame.display.update()
 
+
+def anima_explosion_asteroides(asteroidesDestruidos, numAnimacion):
+    """ Cada vez que se llama a esta funcion hace un paso de la animacion """
+
+    #Redimensiono la imagen
+    medida = 50
+    imagenHumo_aEscala = pygame.transform.scale(imagenHumo[numAnimacion - 1], (medida, medida))
+    
+    #La muestro en pantalla
+    for a in asteroidesDestruidos:
+        windowSurface.blit(imagenHumo_aEscala, a['rect'])
+        
+
 def muestraBarraEnergia(energia):
     """ Dibuja una barra de energia vertical coloreada. Tonos rojos para poca energia y verdes para energias altas """
     nivel_rojo = 255 - energia
@@ -127,6 +142,7 @@ backGroundSound = pygame.mixer.Sound('sonidos/musica de fondo.wav')
 
 # set up images
 imagenExplosion = []
+imagenHumo = []
 imagenNaveCentro = pygame.image.load('nave/nave_centro.png')
 imagenNaveCentroMotorOn = pygame.image.load('nave/nave_centro_motor_on.png')
 imagenNaveIzquierda = pygame.image.load('nave/nave_izquierda.png')
@@ -139,6 +155,14 @@ imagenExplosion.append(pygame.image.load('explosion/explosion3.png'))
 imagenExplosion.append(pygame.image.load('explosion/explosion4.png'))
 imagenExplosion.append(pygame.image.load('explosion/explosion5.png'))
 imagenExplosion.append(pygame.image.load('explosion/explosion6.png'))
+
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0001.png'))
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0002.png'))
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0003.png'))
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0004.png'))
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0005.png'))
+imagenHumo.append(pygame.image.load('humo/smoke_puff_0006.png'))
+
 imagenAsteroide = pygame.image.load('meteoritos/m1.png')
 imagenAsteroideEnergetico = pygame.image.load('meteoritos/mx.png')
 imagenFondo = pygame.image.load('Fondo/fondo.jpg').convert()
@@ -171,11 +195,18 @@ topScore = 0
 while True:
     #Inicializa el juego
     asteroides = []
+    asteroidesDestruidos = []
+    contAnimacion = 0
     energia = INIT_ENERGY
     score = 0
     jugadorRect.topleft = (WINDOWWIDTH / 2, WINDOWHEIGHT - 50)
     moverIzquierda = moverDerecha = moverAdelante = moverAtras = False
     contadorAsteroides = 0
+
+    laser = {'disparado' : False,
+             'origen': (0,0),
+             'duracion': 0}
+  
     backGroundSound.play()
 
     while True: 
@@ -197,6 +228,12 @@ while True:
                 if event.key == K_DOWN or event.key == ord('s'):
                     moverAdelante = False
                     moverAtras = True
+                if event.key == K_SPACE:
+                    if energia > 5:
+                        energia -= 3
+                        laser['disparado'] = True
+                        laser['origen'] = (jugadorRect.left + 25,jugadorRect.top)
+                        laser['duracion'] = 0
 
             if event.type == KEYUP:
                 if event.key == K_ESCAPE:
@@ -231,27 +268,51 @@ while True:
 
         # Mueve al jugador
         energy_factor = energia / INIT_ENERGY
+        vel_jugador =  PLAYERMOVERATE + energy_factor
         if moverIzquierda and jugadorRect.left > 0:
-            jugadorRect.move_ip(-1 * (PLAYERMOVERATE + energy_factor), 0)
+            jugadorRect.move_ip(-1 * vel_jugador , 0)
         if moverDerecha and jugadorRect.right < WINDOWWIDTH:
-            jugadorRect.move_ip((PLAYERMOVERATE + energy_factor), 0)
+            jugadorRect.move_ip(vel_jugador, 0)
         if moverAdelante and jugadorRect.top > 0:
-            jugadorRect.move_ip(0, -1 * (PLAYERMOVERATE + energy_factor))
+            jugadorRect.move_ip(0, -1 * vel_jugador)
         if moverAtras and jugadorRect.bottom < WINDOWHEIGHT:
-            jugadorRect.move_ip(0, (PLAYERMOVERATE + energy_factor))
+            jugadorRect.move_ip(0, vel_jugador)
 
         # Mueve a los asteroides hacia abajo
         for a in asteroides:
             a['rect'].move_ip(0, a['speed'])
-           
 
-         # Elimina los asteroides que han caido al fondo de la pantalla
-        for a in asteroides[:]:
-            if a['rect'].top > WINDOWHEIGHT:
-                asteroides.remove(a)
 
         # Pinta el fondo
         windowSurface.blit(imangenFondo, (0,0))
+        
+        # Dibuja el laser      
+        if laser['disparado']:
+
+            color_blanco = (255,255,255)
+            pygame.draw.rect(windowSurface, color_blanco , (laser['origen'][0], laser['origen'][1], 5, -1 * 700))
+            
+            laser['duracion'] += 1
+            if laser['duracion'] > LASER_DURACION_MAX:
+                laser['disparado'] = False
+
+        
+         # Elimina los asteroides que han caido al fondo de la pantalla y los que son alcanzados por el laser
+        for a in asteroides[:]:
+            if a['rect'].top > WINDOWHEIGHT:
+                asteroides.remove(a)
+            if laser['disparado'] and (a['rect'].top < laser['origen'][1]) and (a['rect'].left < laser['origen'][0] + 25) and (a['rect'].left > laser['origen'][0] - 25):
+                asteroides.remove(a)
+                asteroidesDestruidos.append(a)
+
+        # Anima la explosion de los asteroides destruidos
+        if len(asteroidesDestruidos) > 0:
+            contAnimacion += 1
+            if contAnimacion > 6:
+                asteroidesDestruidos = []
+                contAnimacion = 0
+            else:
+                anima_explosion_asteroides(asteroidesDestruidos, contAnimacion)
 
         # Pone las puntuaciones
         drawText('Score: %s' % (score), font, windowSurface, 10, 0)
@@ -284,7 +345,6 @@ while True:
                 sonidoMotorsOn.stop()
 
            
-
         # Dibuja los asteroides
         for a in asteroides:
             windowSurface.blit(a['surface'], a['rect'])
