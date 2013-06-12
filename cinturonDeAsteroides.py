@@ -19,16 +19,13 @@
 ##		cuanto mayor es la energia mayor la velocidad de la nave.
 ##
 ##	8- Se implementa el laser
-
+##	9- Se implementan los asteroides oblicuos
+##      10- Introducir planetas en segundo plano moviendose mas lentos para dar sensacion de desplazamiento
+##
 ##      Pendientes:
 
-##	9- Se implementan los asteroides oblicuos
-##
-##	10- Rutina de fin de juego con tabla de puntuaciones
-##
-##      11- Introducir planetas en segundo plano moviendose mas lentos para dar sensacion de desplazamiento
-##
-##      12- Variar las tasas de aparcion de los asteroides y la velocidad de los mismos para hacer eljuego mas jugable,
+##	11- Rutina de fin de juego con tabla de puntuaciones
+##      12- Variar las tasas de aparicion de los asteroides y la velocidad de los mismos para hacer eljuego mas jugable,
 ##          con dificultad creciente 
 
 
@@ -36,8 +33,15 @@ import pygame, random, sys
 from pygame.locals import *
 
 INIT_ENERGY = 25
-
 LASER_DURACION_MAX = 5
+MEDIDA_NAVE = 50
+PLANET_MOV_RATE = 30
+NUM_MAX_PLANETAS = 11
+PLANETMAXSIZE = 200
+PLANETMINSIZE = 50
+PLANETSPEED = 1
+GIGANT_PLANET_RATE = 0.20
+
 
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
@@ -64,7 +68,7 @@ def waitForPlayerToPressKey():
                 terminate()
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE: # Al pulsar la tecla esc se sale del juego
-                    terminate()
+                    terminate()     
                 return
             
 def jugadorChocaAsteroide(jugadorRect, asteroides):
@@ -100,8 +104,7 @@ def anima_explosion_asteroides(asteroidesDestruidos, numAnimacion):
     """ Cada vez que se llama a esta funcion hace un paso de la animacion """
 
     #Redimensiono la imagen
-    medida = 50
-    imagenHumo_aEscala = pygame.transform.scale(imagenHumo[numAnimacion - 1], (medida, medida))
+    imagenHumo_aEscala = pygame.transform.scale(imagenHumo[numAnimacion - 1], (MEDIDA_NAVE, MEDIDA_NAVE))
     
     #La muestro en pantalla
     for a in asteroidesDestruidos:
@@ -125,6 +128,7 @@ def muestraBarraEnergia(energia):
   
 # set up pygame
 pygame.init()
+pygame.mixer.init()
 mainClock = pygame.time.Clock()
 windowSurface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
 pygame.display.set_caption('Cinturon de asteroides')
@@ -139,10 +143,12 @@ sonidoExplosion = pygame.mixer.Sound('sonidos/explosion.wav')
 sonidoPickup = pygame.mixer.Sound('sonidos/pickup.wav')
 gameOverSound = pygame.mixer.Sound('sonidos/gameover.wav')
 backGroundSound = pygame.mixer.Sound('sonidos/musica de fondo.wav')
+sonidoLaser = pygame.mixer.Sound('sonidos/lazer.wav')
 
 # set up images
 imagenExplosion = []
 imagenHumo = []
+imagenPlaneta = []
 imagenNaveCentro = pygame.image.load('nave/nave_centro.png')
 imagenNaveCentroMotorOn = pygame.image.load('nave/nave_centro_motor_on.png')
 imagenNaveIzquierda = pygame.image.load('nave/nave_izquierda.png')
@@ -163,23 +169,34 @@ imagenHumo.append(pygame.image.load('humo/smoke_puff_0004.png'))
 imagenHumo.append(pygame.image.load('humo/smoke_puff_0005.png'))
 imagenHumo.append(pygame.image.load('humo/smoke_puff_0006.png'))
 
+imagenPlaneta.append(pygame.image.load('planetas/p1.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p2.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p3.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p4.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p5.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p6.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p7.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p8.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p9.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p10.png'))
+imagenPlaneta.append(pygame.image.load('planetas/p11.png'))
+
 imagenAsteroide = pygame.image.load('meteoritos/m1.png')
 imagenAsteroideEnergetico = pygame.image.load('meteoritos/mx.png')
 imagenFondo = pygame.image.load('Fondo/fondo.jpg').convert()
 jugadorRect = imagenNaveCentro.get_rect()
 
 #Redimensiono las imagenes de la nave
-medida = 50
-imagenNaveCentro_aEscala = pygame.transform.scale(imagenNaveCentro, (medida, medida))
-imagenNaveIzquierda_aEscala = pygame.transform.scale(imagenNaveIzquierda, (medida, medida))
-imagenNaveDerecha_aEscala = pygame.transform.scale(imagenNaveDerecha, (medida, medida))
+imagenNaveCentro_aEscala = pygame.transform.scale(imagenNaveCentro, (MEDIDA_NAVE, MEDIDA_NAVE))
+imagenNaveIzquierda_aEscala = pygame.transform.scale(imagenNaveIzquierda, (MEDIDA_NAVE, MEDIDA_NAVE))
+imagenNaveDerecha_aEscala = pygame.transform.scale(imagenNaveDerecha, (MEDIDA_NAVE, MEDIDA_NAVE))
 
-imagenNaveCentroMotorOn_aEscala = pygame.transform.scale(imagenNaveCentroMotorOn, (medida, medida))
-imagenNaveDerechaMotorOn_aEscala = pygame.transform.scale(imagenNaveDerechaMotorOn, (medida, medida))
-imagenNaveIzquierdaMotorOn_aEscala = pygame.transform.scale(imagenNaveIzquierdaMotorOn, (medida, medida))
+imagenNaveCentroMotorOn_aEscala = pygame.transform.scale(imagenNaveCentroMotorOn, (MEDIDA_NAVE, MEDIDA_NAVE))
+imagenNaveDerechaMotorOn_aEscala = pygame.transform.scale(imagenNaveDerechaMotorOn, (MEDIDA_NAVE, MEDIDA_NAVE))
+imagenNaveIzquierdaMotorOn_aEscala = pygame.transform.scale(imagenNaveIzquierdaMotorOn, (MEDIDA_NAVE, MEDIDA_NAVE))
 
 for i in range(0,5):
-    imagenExplosion[i] = pygame.transform.scale(imagenExplosion[i], (medida, medida))
+    imagenExplosion[i] = pygame.transform.scale(imagenExplosion[i], (MEDIDA_NAVE, MEDIDA_NAVE))
 
 # set up background
 imangenFondo = pygame.transform.scale(imagenFondo, DISPLAYMODE)
@@ -195,17 +212,41 @@ topScore = 0
 while True:
     #Inicializa el juego
     asteroides = []
+    planetas = []
     asteroidesDestruidos = []
-    contAnimacion = 0
     energia = INIT_ENERGY
     score = 0
     jugadorRect.topleft = (WINDOWWIDTH / 2, WINDOWHEIGHT - 50)
     moverIzquierda = moverDerecha = moverAdelante = moverAtras = False
     contadorAsteroides = 0
+    contadorPlanetas =  0 
+    contadorMovPlanetas = 0
+    contAnimacion = 0
 
     laser = {'disparado' : False,
              'origen': (0,0),
              'duracion': 0}
+
+    # Posiciona los planetas
+    i = 0
+    for numPlaneta in range(0,7):
+        i += 1
+        posx = (i * 100)  % WINDOWWIDTH
+        posy = ((i % 4) * 150)  % WINDOWHEIGHT
+        
+        if random.random() <= GIGANT_PLANET_RATE:
+            tamano_Planeta = PLANETMAXSIZE
+            speed = PLANETSPEED * 4     #Los planetas mas grandes estaran mas cerca y por tanto se moveran mas rapido
+        else:
+            tamano_Planeta = PLANETMINSIZE
+            speed = PLANETSPEED
+            
+        imagen = pygame.transform.scale(imagenPlaneta[numPlaneta], (tamano_Planeta, tamano_Planeta))
+        nuevoPlaneta = {'rect': pygame.Rect(posx, posy, tamano_Planeta, tamano_Planeta),
+                    'speed': speed ,
+                    'surface':imagen,
+                    }
+        planetas.append(nuevoPlaneta)
   
     backGroundSound.play()
 
@@ -234,6 +275,7 @@ while True:
                         laser['disparado'] = True
                         laser['origen'] = (jugadorRect.left + 25,jugadorRect.top)
                         laser['duracion'] = 0
+                        sonidoLaser.play()                     
 
             if event.type == KEYUP:
                 if event.key == K_ESCAPE:
@@ -246,6 +288,7 @@ while True:
                     moverAdelante = False
                 if event.key == K_DOWN or event.key == ord('s'):
                     moverAtras = False
+                       
 
         # Pone mas asteroides en la parte alta de la pantalla si son necesarios       
         contadorAsteroides += 1
@@ -259,9 +302,9 @@ while True:
                 imagen = pygame.transform.scale(imagenAsteroide, (tamano_asteroide, tamano_asteroide))
                 
             nuevoAsteroide = {'rect': pygame.Rect(random.randint(0, WINDOWWIDTH-tamano_asteroide), 0 - tamano_asteroide, tamano_asteroide, tamano_asteroide),
-                        'speed': random.randint(ASTEROIDMINSPEED, ASTEROIDMAXSPEED),
+                        'v_speed': random.randint(ASTEROIDMINSPEED, ASTEROIDMAXSPEED),
+                        'h_speed': random.randint(-1 * ASTEROIDMAXSPEED, ASTEROIDMAXSPEED),
                         'surface':imagen,
-                        'animationTime': random.random(),
                         'energetico': esEnergetico,
                         }
             asteroides.append(nuevoAsteroide)
@@ -278,25 +321,22 @@ while True:
         if moverAtras and jugadorRect.bottom < WINDOWHEIGHT:
             jugadorRect.move_ip(0, vel_jugador)
 
-        # Mueve a los asteroides hacia abajo
-        for a in asteroides:
-            a['rect'].move_ip(0, a['speed'])
 
+        # Mueve los planetas
+        contadorMovPlanetas += 1
+        if contadorMovPlanetas == PLANET_MOV_RATE:
+            contadorMovPlanetas = 0
+            for p in planetas:
+                p['rect'].move_ip(0, p['speed'])
+            
+        # Mueve a los asteroides 
+        for a in asteroides:
+            a['rect'].move_ip(a['h_speed'], a['v_speed'])
 
         # Pinta el fondo
         windowSurface.blit(imangenFondo, (0,0))
         
-        # Dibuja el laser      
-        if laser['disparado']:
-
-            color_blanco = (255,255,255)
-            pygame.draw.rect(windowSurface, color_blanco , (laser['origen'][0], laser['origen'][1], 5, -1 * 700))
-            
-            laser['duracion'] += 1
-            if laser['duracion'] > LASER_DURACION_MAX:
-                laser['disparado'] = False
-
-        
+    
          # Elimina los asteroides que han caido al fondo de la pantalla y los que son alcanzados por el laser
         for a in asteroides[:]:
             if a['rect'].top > WINDOWHEIGHT:
@@ -320,6 +360,24 @@ while True:
         drawText('Energy: %s' % (energia), font, windowSurface, 10, 550)
         muestraBarraEnergia(energia)
 
+         # Dibuja los planetas
+        for p in planetas:
+            windowSurface.blit(p['surface'], p['rect'])
+
+        # Dibuja el laser      
+        if laser['disparado']:
+            color_amarillo = (255,255,0)
+            pygame.draw.rect(windowSurface, color_amarillo , (laser['origen'][0], laser['origen'][1], 5, -1 * 700))
+            
+            laser['duracion'] += 1
+            if laser['duracion'] > LASER_DURACION_MAX:
+                laser['disparado'] = False
+           
+        # Dibuja los asteroides
+        for a in asteroides:
+            windowSurface.blit(a['surface'], a['rect'])
+
+
         # Pinta la nave y le da sonido a los motores si va hacia adelante
         if moverDerecha:
             if moverAdelante:
@@ -342,12 +400,7 @@ while True:
                 sonidoMotorsOn.play()
             else:
                 windowSurface.blit(imagenNaveCentro_aEscala, jugadorRect)
-                sonidoMotorsOn.stop()
-
-           
-        # Dibuja los asteroides
-        for a in asteroides:
-            windowSurface.blit(a['surface'], a['rect'])
+                sonidoMotorsOn.stop() 
 
         pygame.display.update()
 
@@ -355,11 +408,10 @@ while True:
         hayChoque = jugadorChocaAsteroide(jugadorRect, asteroides)
         if hayChoque:
             if hayChoque == 'choque destructivo':
-
+                sonidoExplosion.play()
                 energia -= 10
                 # Hace la explosion si la energia baja de 0
                 if energia < 0:
-                    sonidoExplosion.play()
                     animaExplosion()
                     pygame.time.wait(2000)
                     sonidoExplosion.stop()
