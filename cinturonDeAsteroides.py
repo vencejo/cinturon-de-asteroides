@@ -2,6 +2,8 @@
 ##
 ##Se parte del juego "dodger" que aparece en el libro "Invent with Python"
 ##de AI Sweigart's , vease inventwithpython.com
+
+##Agradecimientos tambien a Timothy Downs por su implementacion del modulo inputbox
 ##
 ##Los graficos y los sonidos estan extraidos de www.spriters-resource.com y de
 ##www.freesound.org respectivamente
@@ -21,15 +23,12 @@
 ##	8- Se implementa el laser
 ##	9- Se implementan los asteroides oblicuos
 ##      10- Introducir planetas en segundo plano moviendose mas lentos para dar sensacion de desplazamiento
-##
-##      Pendientes:
-
 ##	11- Rutina de fin de juego con tabla de puntuaciones
-##      12- Variar las tasas de aparicion de los asteroides y la velocidad de los mismos para hacer eljuego mas jugable,
+##      12- Variar las tasas de aparicion de los asteroides y la velocidad de los mismos para hacer el juego mas jugable,
 ##          con dificultad creciente 
 
 
-import pygame, random, sys
+import pygame, random, sys, time,inputbox
 from pygame.locals import *
 
 INIT_ENERGY = 25
@@ -42,20 +41,21 @@ PLANETMINSIZE = 50
 PLANETSPEED = 1
 GIGANT_PLANET_RATE = 0.20
 
-
+##--------------------------------------------- CODIGO DE AI SWEIGART ----------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------
 WINDOWWIDTH = 600
 WINDOWHEIGHT = 600
 DISPLAYMODE = (600,600)
 TEXTCOLOR = (255, 255, 255)
 BACKGROUNDCOLOR = (0, 0, 0)
-FPS = 40
+FPS = 45
 ASTEROIDMINSIZE = 10
 ASTEROIDMAXSIZE = 40
 ASTEROIDMINSPEED = 1
 ASTEROIDMAXSPEED = 8
-ADDNEW_ASTEROID_RATE = 6
+ADDNEW_ASTEROID_RATE = 7
 PLAYERMOVERATE = 5
-TASA_ASTEROIDES_ENERGETICOS = 0.1
+TASA_INICIAL_ASTEROIDES_ENERGETICOS = 0.9
 
 def terminate():
     pygame.quit()
@@ -70,16 +70,18 @@ def waitForPlayerToPressKey():
                 if event.key == K_ESCAPE: # Al pulsar la tecla esc se sale del juego
                     terminate()     
                 return
-            
+##------------------------------------------------------------------------------------------------------------------------
+           
 def jugadorChocaAsteroide(jugadorRect, asteroides):
     """Devuelve falso si no hay choque o una cadena informativa si lo hay 
     si el choque es energertico elemina el asteroide"""
     for a in asteroides[:]:
-        if jugadorRect.colliderect(a['rect']) and a['energetico'] == True:
+        if jugadorRect.colliderect(a['rect']) and a['energetico']  and  a['laseado']  :
             asteroides.remove(a)
             return 'choque energetico'
         elif jugadorRect.colliderect(a['rect']):
             asteroides.remove(a)
+            asteroidesDestruidos.append(a)
             return 'choque destructivo'
         
     return False
@@ -124,7 +126,34 @@ def muestraBarraEnergia(energia):
     color = (nivel_rojo,nivel_verde,0)
     
     pygame.draw.rect(windowSurface, color , (560, 560, 20, -1 * energia))
-   
+
+def introducirPuntuacion(nombre, puntos, puntuaciones):
+    """ Le pide el nombre al jugador y si su puntuacion es mayor que alguno de la tabla de puntuaciones, lo mete en la tabla"""
+    #Primero ordeno la lista de puntuaciones
+    puntuaciones = sorted(puntuaciones,key = lambda p : p[1])
+    #Inserto el elemento en la lista ordenada en el lugar que le corresponde
+    for i in range(len(puntuaciones)):
+        if puntuaciones[i][1] > puntos:
+            index = i
+            break
+    nuevasPuntuaciones = puntuaciones[:i] + [(nombre,puntos)] + puntuaciones[i:]
+
+    return nuevasPuntuaciones
+
+def imprimePuntuaciones(puntuaciones):
+    """Imprime los cinco registros mas altos """
+    windowSurface.fill((0, 0, 0), (0, 0, WINDOWWIDTH, WINDOWHEIGHT))
+    pygame.display.update()
+    num_pun = len(puntuaciones) - 1
+    drawText("Puntuaciones", font, windowSurface, (WINDOWWIDTH / 5) + 50, (WINDOWHEIGHT / 4))
+    cont = 1
+    for i in range(num_pun, num_pun - 5, -1):
+        drawText(str(puntuaciones[i]), font, windowSurface, (WINDOWWIDTH / 5) + 100, (WINDOWHEIGHT / 3) + cont * 40)
+        cont += 1
+        
+    drawText('Pulsa una tecla para volver a jugar', font, windowSurface, 10, 500)
+    pygame.display.update()
+    
   
 # set up pygame
 pygame.init()
@@ -183,6 +212,8 @@ imagenPlaneta.append(pygame.image.load('planetas/p11.png'))
 
 imagenAsteroide = pygame.image.load('meteoritos/m1.png')
 imagenAsteroideEnergetico = pygame.image.load('meteoritos/mx.png')
+imagenEnergia = pygame.image.load('energia/energy.png')
+imagenEnergia = pygame.transform.scale(imagenEnergia, (ASTEROIDMAXSIZE/2, ASTEROIDMAXSIZE/2))
 imagenFondo = pygame.image.load('Fondo/fondo.jpg').convert()
 jugadorRect = imagenNaveCentro.get_rect()
 
@@ -202,6 +233,9 @@ for i in range(0,5):
 imangenFondo = pygame.transform.scale(imagenFondo, DISPLAYMODE)
 windowSurface.blit(imangenFondo, (0,0))
 
+# Prepara la lista de puntuaciones:
+puntuaciones = [('...', 0) for i in range(0,5) ]
+
 # Muestra la pantalla de bienvenida
 drawText('Cinturon de Asteroides', font, windowSurface, (WINDOWWIDTH / 10), (WINDOWHEIGHT / 3))
 drawText('Pulse una tecla para empezar', font, windowSurface, (WINDOWWIDTH / 10) - 30, (WINDOWHEIGHT / 3) + 50)
@@ -210,7 +244,12 @@ waitForPlayerToPressKey()
 
 topScore = 0
 while True:
+    #Inicializo el reloj
+    tiempo_inicial = time.clock()
+    
     #Inicializa el juego
+    tasaAparicionAsteroides = ADDNEW_ASTEROID_RATE
+    tasaAsteroidesEnergeticos = TASA_INICIAL_ASTEROIDES_ENERGETICOS
     asteroides = []
     planetas = []
     asteroidesDestruidos = []
@@ -251,7 +290,11 @@ while True:
     backGroundSound.play()
 
     while True: 
-        
+
+##--------------------------------------------- CODIGO DE AI SWEIGART ----------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------
+
+        # Eventos del teclado
         for event in pygame.event.get():
             if event.type == QUIT:
                 terminate()
@@ -288,14 +331,15 @@ while True:
                     moverAdelante = False
                 if event.key == K_DOWN or event.key == ord('s'):
                     moverAtras = False
-                       
+##------------------------------------------------------------------------------------------------------------------------
+                      
 
         # Pone mas asteroides en la parte alta de la pantalla si son necesarios       
         contadorAsteroides += 1
         if contadorAsteroides == ADDNEW_ASTEROID_RATE:
             contadorAsteroides = 0
             tamano_asteroide = random.randint(ASTEROIDMINSIZE, ASTEROIDMAXSIZE)
-            esEnergetico = (random.random() > 1 - TASA_ASTEROIDES_ENERGETICOS)
+            esEnergetico = (random.random() < tasaAsteroidesEnergeticos)
             if esEnergetico:
                 imagen = pygame.transform.scale(imagenAsteroideEnergetico, (tamano_asteroide, tamano_asteroide))
             else:
@@ -306,8 +350,12 @@ while True:
                         'h_speed': random.randint(-1 * ASTEROIDMAXSPEED, ASTEROIDMAXSPEED),
                         'surface':imagen,
                         'energetico': esEnergetico,
+                        'laseado': False,
                         }
             asteroides.append(nuevoAsteroide)
+
+##--------------------------------------------- CODIGO DE AI SWEIGART ----------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------
 
         # Mueve al jugador
         energy_factor = energia / INIT_ENERGY
@@ -320,6 +368,8 @@ while True:
             jugadorRect.move_ip(0, -1 * vel_jugador)
         if moverAtras and jugadorRect.bottom < WINDOWHEIGHT:
             jugadorRect.move_ip(0, vel_jugador)
+
+##------------------------------------------------------------------------------------------------------------------------
 
 
         # Mueve los planetas
@@ -335,30 +385,16 @@ while True:
 
         # Pinta el fondo
         windowSurface.blit(imangenFondo, (0,0))
-        
-    
-         # Elimina los asteroides que han caido al fondo de la pantalla y los que son alcanzados por el laser
-        for a in asteroides[:]:
-            if a['rect'].top > WINDOWHEIGHT:
-                asteroides.remove(a)
-            if laser['disparado'] and (a['rect'].top < laser['origen'][1]) and (a['rect'].left < laser['origen'][0] + 25) and (a['rect'].left > laser['origen'][0] - 25):
-                asteroides.remove(a)
-                asteroidesDestruidos.append(a)
 
         # Anima la explosion de los asteroides destruidos
         if len(asteroidesDestruidos) > 0:
             contAnimacion += 1
-            if contAnimacion > 6:
+            if contAnimacion > 12:
                 asteroidesDestruidos = []
                 contAnimacion = 0
-            else:
-                anima_explosion_asteroides(asteroidesDestruidos, contAnimacion)
+            elif contAnimacion % 2 == 0:
+                anima_explosion_asteroides(asteroidesDestruidos, contAnimacion/2)
 
-        # Pone las puntuaciones
-        drawText('Score: %s' % (score), font, windowSurface, 10, 0)
-        drawText('Top Score: %s' % (topScore), font, windowSurface, 10, 40)
-        drawText('Energy: %s' % (energia), font, windowSurface, 10, 550)
-        muestraBarraEnergia(energia)
 
          # Dibuja los planetas
         for p in planetas:
@@ -400,9 +436,39 @@ while True:
                 sonidoMotorsOn.play()
             else:
                 windowSurface.blit(imagenNaveCentro_aEscala, jugadorRect)
-                sonidoMotorsOn.stop() 
+                sonidoMotorsOn.stop()
 
-        pygame.display.update()
+        # Pone las puntuaciones y tiempos
+        drawText('Puntos: %s' % (score), font, windowSurface, 10, 0)
+        drawText('Mejor: %s' % (topScore), font, windowSurface, 10, 40)
+
+        tiempo_actual = time.clock()
+        tiempo = tiempo_actual - tiempo_inicial
+        tiempo = tiempo * 2
+        drawText('Tiempo: %s' % (tiempo ), font, windowSurface, 400, 0)
+        if tiempo > 60:
+            if score > topScore:
+                        topScore = score 
+            break
+        elif tiempo % 10 == 0:
+            #Hago que aparezcan mas asteroides y que sean menos energeticos cada 10 segundos
+            tasaAparicionAsteroides -= 1 
+            tasaAsteroidesEnergeticos -= 0.1
+        
+        drawText('Energia: %s' % (energia), font, windowSurface, 400, 40)
+        muestraBarraEnergia(energia)
+
+         # Elimina los asteroides que han caido al fondo de la pantalla y los que son alcanzados por el laser
+        for a in asteroides[:]:
+            if a['rect'].top > WINDOWHEIGHT:
+                asteroides.remove(a)
+            if laser['disparado'] and (a['rect'].top < laser['origen'][1]) and (a['rect'].left < laser['origen'][0] + 25) and (a['rect'].left > laser['origen'][0] - 25):
+                if not a['energetico']: 
+                    asteroides.remove(a)
+                    asteroidesDestruidos.append(a)
+                else:
+                    a['laseado'] = True
+                    a['surface'] = imagenEnergia
 
         # Comprueba la colision de algun asteroide con el jugador
         hayChoque = jugadorChocaAsteroide(jugadorRect, asteroides)
@@ -424,17 +490,26 @@ while True:
                 sonidoPickup.play()
                 energia += 10
 
-        mainClock.tick(FPS)
+        pygame.display.update()
 
-        
+        mainClock.tick(FPS)
+       
 
     # Para el juego y muestra la pantalla de Game Over
     backGroundSound.stop()
     gameOverSound.play()
 
-    drawText('GAME OVER', font, windowSurface, (WINDOWWIDTH / 6), (WINDOWHEIGHT / 3))
-    drawText('Pulsa una tecla para volver a jugar', font, windowSurface, (WINDOWWIDTH / 6) - 80, (WINDOWHEIGHT / 3) + 50)
+    drawText('GAME OVER', font, windowSurface, (WINDOWWIDTH / 5) + 100, (WINDOWHEIGHT / 3))
     pygame.display.update()
+    pygame.time.wait(1500)
+    
+    windowSurface.fill((0, 0, 0), (0, 0, WINDOWWIDTH, WINDOWHEIGHT))
+    nombre = inputbox.ask(windowSurface, "Introduce tu nombre ")
+    pygame.display.update()
+    
+    puntuaciones = introducirPuntuacion(nombre, score, puntuaciones)
+    imprimePuntuaciones(puntuaciones)
+    
     waitForPlayerToPressKey()
 
     gameOverSound.stop()
