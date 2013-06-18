@@ -6,6 +6,10 @@ Agradecimientos tambien a Timothy Downs por su implementacion del modulo inputbo
 
 Los graficos y los sonidos estan extraidos de www.spriters-resource.com y de www.freesound.org respectivamente
 
+SCREENCAST:
+    
+    http://youtu.be/sVeu33pNoNY
+
 ARGUMENTO:
 
 	Tu mision es dificil, conducir tu nave por el peligroso cinturon de asteroides de Aldebaran para 		recolectar la preciosa energia que hay escondidad dentro de los asteroides blancos.
